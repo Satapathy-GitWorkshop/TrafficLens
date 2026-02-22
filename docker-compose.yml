@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # ─── DATABASE ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: trafficlens-postgres
+    environment:
+      POSTGRES_USER: trafficlens
+      POSTGRES_PASSWORD: trafficlens123
+      POSTGRES_DB: trafficlens
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - trafficlens-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trafficlens"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── BACKEND SERVICES ─────────────────────────────────────────────────────
+  auth-service:
+    build: ./backend/auth-service
+    container_name: trafficlens-auth
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trafficlens
+      SPRING_DATASOURCE_USERNAME: trafficlens
+      SPRING_DATASOURCE_PASSWORD: trafficlens123
+      JWT_SECRET: trafficlens-super-secret-jwt-key-2024-production
+      JWT_EXPIRATION: 86400000
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trafficlens-network
+
+  ingestion-service:
+    build: ./backend/ingestion-service
+    container_name: trafficlens-ingestion
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trafficlens
+      SPRING_DATASOURCE_USERNAME: trafficlens
+      SPRING_DATASOURCE_PASSWORD: trafficlens123
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trafficlens-network
+
+  analytics-service:
+    build: ./backend/analytics-service
+    container_name: trafficlens-analytics
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trafficlens
+      SPRING_DATASOURCE_USERNAME: trafficlens
+      SPRING_DATASOURCE_PASSWORD: trafficlens123
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trafficlens-network
+
+  report-service:
+    build: ./backend/report-service
+    container_name: trafficlens-report
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trafficlens
+      SPRING_DATASOURCE_USERNAME: trafficlens
+      SPRING_DATASOURCE_PASSWORD: trafficlens123
+      ANALYTICS_SERVICE_URL: http://analytics-service:8083
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trafficlens-network
+
+  api-gateway:
+    build: ./backend/api-gateway
+    container_name: trafficlens-gateway
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8081
+      INGESTION_SERVICE_URL: http://ingestion-service:8082
+      ANALYTICS_SERVICE_URL: http://analytics-service:8083
+      REPORT_SERVICE_URL: http://report-service:8084
+      JWT_SECRET: trafficlens-super-secret-jwt-key-2024-production
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - ingestion-service
+      - analytics-service
+      - report-service
+    networks:
+      - trafficlens-network
+
+  # ─── FRONTEND ─────────────────────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: trafficlens-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - trafficlens-network
+
+networks:
+  trafficlens-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

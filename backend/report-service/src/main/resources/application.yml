@@ -1,0 +1,22 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: report-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/trafficlens}
+    username: ${SPRING_DATASOURCE_USERNAME:trafficlens}
+    password: ${SPRING_DATASOURCE_PASSWORD:trafficlens123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+analytics:
+  service:
+    url: ${ANALYTICS_SERVICE_URL:http://localhost:8083}
+
+reports:
+  directory: /tmp/trafficlens-reports

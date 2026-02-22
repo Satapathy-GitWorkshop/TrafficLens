@@ -1,0 +1,18 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: analytics-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/trafficlens}
+    username: ${SPRING_DATASOURCE_USERNAME:trafficlens}
+    password: ${SPRING_DATASOURCE_PASSWORD:trafficlens123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+jwt:
+  secret: ${JWT_SECRET:trafficlens-super-secret-jwt-key-2024-production}

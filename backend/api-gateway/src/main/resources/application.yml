@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+      routes:
+        # Auth Service - public routes
+        - id: auth-public
+          uri: ${AUTH_SERVICE_URL:http://auth-service:8081}
+          predicates:
+            - Path=/api/auth/login,/api/auth/register,/api/auth/validate,/api/auth/health
+          filters:
+            - StripPrefix=0
+
+        # Auth Service - protected routes
+        - id: auth-protected
+          uri: ${AUTH_SERVICE_URL:http://auth-service:8081}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        # Ingestion Service - public (tracking events from websites)
+        - id: ingestion
+          uri: ${INGESTION_SERVICE_URL:http://ingestion-service:8082}
+          predicates:
+            - Path=/api/ingest/**
+          filters:
+            - StripPrefix=0
+
+        # Analytics Service - protected
+        - id: analytics
+          uri: ${ANALYTICS_SERVICE_URL:http://analytics-service:8083}
+          predicates:
+            - Path=/api/analytics/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+        # Report Service - protected
+        - id: reports
+          uri: ${REPORT_SERVICE_URL:http://report-service:8084}
+          predicates:
+            - Path=/api/reports/**
+          filters:
+            - StripPrefix=0
+            - name: JwtAuthFilter
+
+jwt:
+  secret: ${JWT_SECRET:trafficlens-super-secret-jwt-key-2024-production}
