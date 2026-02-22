@@ -1,9 +1,5 @@
 # 🔍 TrafficLens — Analytics Platform
 
-> A full-featured, privacy-first Google Analytics competitor built with Java Microservices + React + PostgreSQL + Docker.
-
----
-
 ## 📋 Table of Contents
 
 1. [Project Overview](#-project-overview)
