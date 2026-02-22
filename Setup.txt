@@ -1,0 +1,592 @@
+================================================================================
+  TRAFFICLENS — COMPLETE SETUP GUIDE
+  Setup from scratch on a fresh machine
+================================================================================
+
+TABLE OF CONTENTS
+─────────────────
+  1. Prerequisites
+  2. Quick Start (Docker — Recommended)
+  3. Manual Setup (Without Docker)
+  4. Verify Everything is Running
+  5. First Steps in the App
+  6. Add Tracking to Your Website
+  7. Production Deployment
+  8. Troubleshooting
+  9. Resetting the Database
+ 10. Updating the Project
+
+================================================================================
+  1. PREREQUISITES
+================================================================================
+
+You need the following installed on your machine:
+
+────────────────────────────────────────
+  FOR DOCKER SETUP (Recommended):
+────────────────────────────────────────
+
+  ✅ Docker Desktop (includes Docker + Docker Compose)
+     Download: https://www.docker.com/products/docker-desktop
+     Version required: Docker 20.x or later
+
+  That's it! Docker handles Java, Node, PostgreSQL automatically.
+
+────────────────────────────────────────
+  FOR MANUAL SETUP (Without Docker):
+────────────────────────────────────────
+
+  ✅ Java 17 (JDK — not JRE)
+     Download: https://adoptium.net/
+     Verify: java -version   →   should show "17.x.x"
+
+  ✅ Maven 3.9+
+     Download: https://maven.apache.org/download.cgi
+     Verify: mvn -version   →   should show "3.9.x"
+
+  ✅ Node.js 20+
+     Download: https://nodejs.org/
+     Verify: node -version   →   should show "v20.x.x"
+
+  ✅ npm 10+ (comes with Node.js)
+     Verify: npm -version   →   should show "10.x.x"
+
+  ✅ PostgreSQL 15
+     Download: https://www.postgresql.org/download/
+     Verify: psql --version   →   should show "15.x"
+
+================================================================================
+  2. QUICK START WITH DOCKER (Recommended)
+================================================================================
+
+  This is the easiest way. One command starts everything.
+
+  STEP 1 — Extract the project
+  ─────────────────────────────
+    If you downloaded the ZIP file:
+
+    Windows:
+      Right-click trafficlens.zip → "Extract All" → choose a folder
+
+    Mac / Linux:
+      unzip trafficlens.zip
+
+  STEP 2 — Open a terminal in the project folder
+  ─────────────────────────────────────────────
+    Windows:
+      Open File Explorer → go to the trafficlens folder
+      Hold Shift + Right-click → "Open PowerShell window here"
+      OR open Command Prompt and type: cd path\to\trafficlens
+
+    Mac:
+      Open Terminal
+      cd ~/Downloads/trafficlens   (adjust path as needed)
+
+    Linux:
+      cd ~/trafficlens
+
+  STEP 3 — Start everything
+  ──────────────────────────
+    docker-compose up --build
+
+    ⏳ First run takes 5–10 minutes (downloads Java, Node, builds everything)
+    ⏳ Subsequent runs take about 30 seconds
+
+    You will see logs from all services. Wait until you see:
+      trafficlens-auth    | Started AuthServiceApplication
+      trafficlens-gateway | Started ApiGatewayApplication
+      trafficlens-frontend | /docker-entrypoint.sh: Configuration complete
+
+  STEP 4 — Open the app
+  ──────────────────────
+    Open your browser and go to:
+
+      http://localhost:3000
+
+  DONE! 🎉
+
+  ─────────────────────────────
+  To stop the app:
+    Press Ctrl+C in the terminal
+    OR run: docker-compose down
+
+  To run in background (detached mode):
+    docker-compose up --build -d
+
+  To see logs when running in background:
+    docker-compose logs -f
+
+  To stop when running in background:
+    docker-compose down
+
+================================================================================
+  3. MANUAL SETUP (Without Docker)
+================================================================================
+
+  Use this if you don't want Docker or want to run services individually.
+
+────────────────────────────────────────
+  STEP 1 — Setup PostgreSQL Database
+────────────────────────────────────────
+
+  Start PostgreSQL on your machine, then open psql:
+
+    psql -U postgres
+
+  Run these commands:
+
+    CREATE USER trafficlens WITH PASSWORD 'trafficlens123';
+    CREATE DATABASE trafficlens OWNER trafficlens;
+    GRANT ALL PRIVILEGES ON DATABASE trafficlens TO trafficlens;
+    \q
+
+  Now run the schema:
+
+    psql -U trafficlens -d trafficlens -f init.sql
+
+  Verify tables were created:
+
+    psql -U trafficlens -d trafficlens -c "\dt"
+
+  You should see: users, sites, events, sessions, page_view_stats, reports
+
+────────────────────────────────────────
+  STEP 2 — Start Auth Service (Port 8081)
+────────────────────────────────────────
+
+  Open a new terminal:
+
+    cd backend/auth-service
+
+    # Windows:
+    set SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/trafficlens
+    set SPRING_DATASOURCE_USERNAME=trafficlens
+    set SPRING_DATASOURCE_PASSWORD=trafficlens123
+    mvn spring-boot:run
+
+    # Mac / Linux:
+    SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/trafficlens \
+    SPRING_DATASOURCE_USERNAME=trafficlens \
+    SPRING_DATASOURCE_PASSWORD=trafficlens123 \
+    mvn spring-boot:run
+
+  Wait for: "Started AuthServiceApplication on port 8081"
+
+────────────────────────────────────────
+  STEP 3 — Start Ingestion Service (Port 8082)
+────────────────────────────────────────
+
+  Open a new terminal:
+
+    cd backend/ingestion-service
+
+    # Mac / Linux:
+    SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/trafficlens \
+    SPRING_DATASOURCE_USERNAME=trafficlens \
+    SPRING_DATASOURCE_PASSWORD=trafficlens123 \
+    mvn spring-boot:run
+
+  Wait for: "Started IngestionServiceApplication on port 8082"
+
+────────────────────────────────────────
+  STEP 4 — Start Analytics Service (Port 8083)
+────────────────────────────────────────
+
+  Open a new terminal:
+
+    cd backend/analytics-service
+
+    # Mac / Linux:
+    SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/trafficlens \
+    SPRING_DATASOURCE_USERNAME=trafficlens \
+    SPRING_DATASOURCE_PASSWORD=trafficlens123 \
+    mvn spring-boot:run
+
+  Wait for: "Started AnalyticsServiceApplication on port 8083"
+
+────────────────────────────────────────
+  STEP 5 — Start Report Service (Port 8084)
+────────────────────────────────────────
+
+  Open a new terminal:
+
+    cd backend/report-service
+
+    # Mac / Linux:
+    SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/trafficlens \
+    SPRING_DATASOURCE_USERNAME=trafficlens \
+    SPRING_DATASOURCE_PASSWORD=trafficlens123 \
+    ANALYTICS_SERVICE_URL=http://localhost:8083 \
+    mvn spring-boot:run
+
+  Wait for: "Started ReportServiceApplication on port 8084"
+
+────────────────────────────────────────
+  STEP 6 — Start API Gateway (Port 8080)
+────────────────────────────────────────
+
+  Open a new terminal:
+
+    cd backend/api-gateway
+
+    # Mac / Linux:
+    AUTH_SERVICE_URL=http://localhost:8081 \
+    INGESTION_SERVICE_URL=http://localhost:8082 \
+    ANALYTICS_SERVICE_URL=http://localhost:8083 \
+    REPORT_SERVICE_URL=http://localhost:8084 \
+    mvn spring-boot:run
+
+  Wait for: "Started ApiGatewayApplication on port 8080"
+
+────────────────────────────────────────
+  STEP 7 — Start React Frontend (Port 3000)
+────────────────────────────────────────
+
+  Open a new terminal:
+
+    cd frontend
+    npm install
+    npm run dev
+
+  Wait for: "Local: http://localhost:5173"
+
+  NOTE: In dev mode, the frontend runs on port 5173, not 3000.
+        The API proxy is configured in vite.config.js to forward
+        /api/* requests to http://localhost:8080 (the gateway).
+
+  Open browser: http://localhost:5173
+
+================================================================================
+  4. VERIFY EVERYTHING IS RUNNING
+================================================================================
+
+  After starting all services, verify each one is healthy:
+
+  ── API Gateway ────────────────────────────────────
+    curl http://localhost:8080/api/auth/health
+    Expected: { "status": "UP", "service": "auth-service" }
+
+  ── Auth Service ───────────────────────────────────
+    curl http://localhost:8081/api/auth/health
+    Expected: { "status": "UP", "service": "auth-service" }
+
+  ── Ingestion Service ──────────────────────────────
+    curl http://localhost:8082/api/ingest/health
+    Expected: { "status": "UP", "service": "ingestion-service" }
+
+  ── Analytics Service ──────────────────────────────
+    curl http://localhost:8083/api/analytics/health
+    Expected: { "status": "UP", "service": "analytics-service" }
+
+  ── Report Service ─────────────────────────────────
+    curl http://localhost:8084/api/reports/health
+    Expected: { "status": "UP", "service": "report-service" }
+
+  ── Frontend ───────────────────────────────────────
+    Open http://localhost:3000 in browser
+    Should see the TrafficLens landing page
+
+  ── Database ───────────────────────────────────────
+    Docker: docker exec -it trafficlens-postgres psql -U trafficlens -c "\dt"
+    Manual: psql -U trafficlens -d trafficlens -c "\dt"
+    Should show 6 tables
+
+================================================================================
+  5. FIRST STEPS IN THE APP
+================================================================================
+
+  STEP 1 — Create your account
+  ──────────────────────────────
+    Go to http://localhost:3000/register
+    Enter your name, email, and password (min 6 characters)
+    Click "Create Account"
+    You will be redirected to the Dashboard
+
+  STEP 2 — Add your first website
+  ──────────────────────────────────
+    Click "Settings" in the left sidebar
+    Click "Add Site" button (top right)
+    Enter:
+      Site Name: My Website
+      Domain:    mywebsite.com
+    Click "Add Site"
+
+    You will see your site appear with a unique Site Key like:
+      mywebsite_abc12345
+
+  STEP 3 — Get your tracking snippet
+  ─────────────────────────────────────
+    In Settings, click "Get Snippet" on your site
+    Click "Copy" to copy the snippet to clipboard
+
+  STEP 4 — View your dashboard
+  ──────────────────────────────
+    Click "Dashboard" in the sidebar
+    Select your site from the site selector (top right)
+    Data will appear as events come in
+
+================================================================================
+  6. ADD TRACKING TO YOUR WEBSITE
+================================================================================
+
+  Copy this snippet and paste it before </head> on EVERY page of your website.
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │  <!-- TrafficLens Analytics -->                             │
+  │  <script>                                                   │
+  │    window.TrafficLens = {                                   │
+  │      siteKey: "YOUR_SITE_KEY_HERE",                         │
+  │      apiUrl: "http://localhost:8080"                        │
+  │    };                                                       │
+  │    var s = document.createElement('script');                │
+  │    s.src = window.TrafficLens.apiUrl + '/tracker.js';       │
+  │    s.async = true;                                          │
+  │    document.head.appendChild(s);                            │
+  │  </script>                                                  │
+  └─────────────────────────────────────────────────────────────┘
+
+  Replace YOUR_SITE_KEY_HERE with the key from Settings.
+  Replace http://localhost:8080 with your server URL in production.
+
+  ── Framework-specific instructions ──────────────────────────
+
+  REACT / NEXT.JS:
+    Add to public/index.html (React) or app/layout.js (Next.js):
+    The tracker auto-handles SPA navigation via pushState.
+
+  WORDPRESS:
+    Go to Appearance → Theme Editor → header.php
+    Paste before </head>
+    OR use a plugin like "Insert Headers and Footers"
+
+  VUE.JS:
+    Add to public/index.html before </head>
+
+  PLAIN HTML:
+    Add to every .html file before </head>
+
+  PHP / LARAVEL:
+    Add to your main layout file (e.g. layouts/app.blade.php)
+
+  ── Custom Events ────────────────────────────────────────────
+
+  After the snippet is loaded, you can track custom events:
+
+    // Track a button click
+    document.getElementById('signup-btn').addEventListener('click', function() {
+      TrafficLens.track('signup_click')
+    })
+
+    // Track a purchase
+    function onPurchaseComplete(order) {
+      TrafficLens.track('purchase', {
+        orderId: order.id,
+        amount: order.total,
+        currency: 'USD'
+      })
+    }
+
+    // Track a logged-in user
+    function onUserLogin(user) {
+      TrafficLens.identify(user.id)
+    }
+
+================================================================================
+  7. PRODUCTION DEPLOYMENT
+================================================================================
+
+  For deploying to a live server (e.g. AWS, DigitalOcean, VPS):
+
+  STEP 1 — Change the JWT Secret
+  ──────────────────────────────
+    In docker-compose.yml, change this value to something random and long:
+
+      JWT_SECRET: your-random-secret-at-least-32-chars-long-here-2024
+
+    Generate a secure secret:
+      Mac/Linux: openssl rand -hex 32
+      Online: https://www.allkeysgenerator.com/
+
+  STEP 2 — Change Database Password
+  ───────────────────────────────────
+    In docker-compose.yml, change all occurrences of:
+      POSTGRES_PASSWORD: trafficlens123
+      SPRING_DATASOURCE_PASSWORD: trafficlens123
+    to a strong password.
+
+  STEP 3 — Update API URL in tracker snippet
+  ────────────────────────────────────────────
+    When adding the snippet to tracked websites, use your real server URL:
+      apiUrl: "https://analytics.yourdomain.com"
+    instead of:
+      apiUrl: "http://localhost:8080"
+
+  STEP 4 — Set up a domain with nginx / reverse proxy (optional)
+  ──────────────────────────────────────────────────────────────
+    Point your domain to the server, then set up Nginx or Caddy to:
+      - analytics.yourdomain.com → port 3000 (frontend)
+      - api.yourdomain.com → port 8080 (gateway)
+
+  STEP 5 — Deploy with Docker
+  ────────────────────────────
+    On your server:
+      git clone your-repo (or upload the ZIP and extract)
+      cd trafficlens
+      docker-compose up -d --build
+
+  STEP 6 — Set up SSL (HTTPS)
+  ─────────────────────────────
+    Use Certbot for free SSL:
+      sudo apt install certbot python3-certbot-nginx
+      sudo certbot --nginx -d analytics.yourdomain.com
+
+================================================================================
+  8. TROUBLESHOOTING
+================================================================================
+
+  ── Problem: Port already in use ─────────────────────────────
+    Error: "address already in use :8080"
+
+    Find what's using the port:
+      Mac/Linux: lsof -i :8080
+      Windows:   netstat -ano | findstr :8080
+
+    Kill the process or change the port in docker-compose.yml
+
+  ── Problem: Docker build fails ──────────────────────────────
+    Try cleaning Docker cache:
+      docker-compose down
+      docker system prune -f
+      docker-compose up --build
+
+  ── Problem: Services can't connect to database ──────────────
+    Check PostgreSQL is healthy:
+      docker ps   →   look for trafficlens-postgres
+      docker logs trafficlens-postgres
+
+    The backend services wait for postgres health check.
+    If it's not starting, check disk space.
+
+  ── Problem: Frontend shows blank page ───────────────────────
+    Check browser console for errors (F12)
+    Check that the API gateway is running:
+      curl http://localhost:8080/api/auth/health
+
+    Check Nginx logs:
+      docker logs trafficlens-frontend
+
+  ── Problem: Login fails with "User not found" ───────────────
+    You need to register first at:
+      http://localhost:3000/register
+
+  ── Problem: No data showing in dashboard ────────────────────
+    1. Make sure you added a site in Settings
+    2. Make sure you added the tracking snippet to your website
+    3. Visit your website a few times
+    4. Check the dashboard with the correct site selected
+
+  ── Problem: mvn command not found (manual setup) ────────────
+    Maven is not installed or not in PATH.
+    Download from: https://maven.apache.org/download.cgi
+    Add to PATH following the instructions on that page.
+
+  ── Problem: java command not found (manual setup) ───────────
+    Java 17 is not installed.
+    Download from: https://adoptium.net/
+    Select: Java 17 (LTS)
+
+  ── Check all container statuses ─────────────────────────────
+    docker ps
+
+    All 7 containers should show "Up" status:
+      trafficlens-postgres
+      trafficlens-auth
+      trafficlens-ingestion
+      trafficlens-analytics
+      trafficlens-report
+      trafficlens-gateway
+      trafficlens-frontend
+
+  ── View logs for a specific service ─────────────────────────
+    docker logs trafficlens-auth
+    docker logs trafficlens-gateway
+    docker logs trafficlens-postgres
+
+    Follow live logs:
+    docker logs -f trafficlens-auth
+
+================================================================================
+  9. RESETTING THE DATABASE
+================================================================================
+
+  ⚠️  WARNING: This deletes ALL your data!
+
+  STEP 1 — Stop all services:
+    docker-compose down
+
+  STEP 2 — Remove the database volume:
+    docker volume rm trafficlens_postgres_data
+
+  STEP 3 — Start fresh:
+    docker-compose up --build
+
+  The init.sql schema will be applied automatically on first start.
+
+================================================================================
+  10. UPDATING THE PROJECT
+================================================================================
+
+  If you make changes to Java code:
+    docker-compose up --build
+
+  If you make changes to React code only:
+    docker-compose up --build frontend
+
+  If you only change application.yml or environment variables:
+    docker-compose restart api-gateway
+    (or whichever service you changed)
+
+  Rebuild a single service:
+    docker-compose build auth-service
+    docker-compose up -d auth-service
+
+================================================================================
+  QUICK REFERENCE — PORTS
+================================================================================
+
+  Service              Port    URL
+  ─────────────────────────────────────────────────────────
+  Frontend (React)     3000    http://localhost:3000
+  API Gateway          8080    http://localhost:8080
+  Auth Service         8081    http://localhost:8081/api/auth/health
+  Ingestion Service    8082    http://localhost:8082/api/ingest/health
+  Analytics Service    8083    http://localhost:8083/api/analytics/health
+  Report Service       8084    http://localhost:8084/api/reports/health
+  PostgreSQL           5432    (internal — use pgAdmin or psql to access)
+
+================================================================================
+  QUICK REFERENCE — COMMANDS
+================================================================================
+
+  Start everything:         docker-compose up --build
+  Start in background:      docker-compose up --build -d
+  Stop everything:          docker-compose down
+  View all logs:            docker-compose logs -f
+  View specific service:    docker-compose logs -f auth-service
+  Restart a service:        docker-compose restart analytics-service
+  Rebuild & restart one:    docker-compose up --build analytics-service
+  List running containers:  docker ps
+  Enter postgres shell:     docker exec -it trafficlens-postgres psql -U trafficlens
+  Reset database:           docker-compose down && docker volume rm trafficlens_postgres_data
+
+================================================================================
+  SUPPORT
+================================================================================
+
+  If you run into issues:
+  1. Check Section 8 (Troubleshooting) above
+  2. Run: docker-compose logs > logs.txt
+     This saves all logs to a file for debugging
+  3. Make sure all prerequisites are installed and at the correct version
+
+================================================================================
